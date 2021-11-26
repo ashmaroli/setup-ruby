@@ -59481,12 +59481,16 @@ async function setupRuby(options = {}) {
       await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['--version']))
   } else {
     await common.measure('Updating Rubygems', async () =>
-      await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['update', '--system', inputs['rubygems-version']], async () =>
-        await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['uninstall', 'bundler'])))
+      await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['update', '--system', inputs['rubygems-version']]))
   }
 
   if (inputs['bundler'] !== 'none') {
     const [gemfile, lockFile] = bundler.detectGemfiles()
+
+    if(inputs['rubygems-version'] !== 'default') {
+      await common.measure('Unistalling existing Bundler version(s)', async () =>
+        await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['uninstall', 'bundler', '-aI']))
+    }
 
     const bundlerVersion = await common.measure('Installing Bundler', async () =>
       bundler.installBundler(inputs['bundler'], lockFile, platform, rubyPrefix, engine, version))
