@@ -64,7 +64,7 @@ async function afterLockFile(lockFile, platform, engine, rubyVersion) {
   }
 }
 
-async function installBundler(bundlerVersionInput, lockFile, platform, rubyPrefix, engine, rubyVersion) {
+async function installBundler(bundlerVersionInput, lockFile, platform, rubyPrefix, engine, rubyVersion, rubygemsVersionInput) {
   let bundlerVersion = bundlerVersionInput
 
   if (bundlerVersion === 'default' || bundlerVersion === 'Gemfile.lock') {
@@ -102,6 +102,8 @@ async function installBundler(bundlerVersionInput, lockFile, platform, rubyPrefi
     console.log(`Using Bundler 2 shipped with ${engine}-${rubyVersion}`)
   } else if (engine.startsWith('truffleruby') && common.isBundler1Default(engine, rubyVersion) && bundlerVersion.startsWith('1')) {
     console.log(`Using Bundler 1 shipped with ${engine}-${rubyVersion}`)
+  } else if (rubygemsVersionInput !== 'default') {
+    console.log(`Using default Bundler installed with Rubygems ${rubygemsVersionInput}`)
   } else {
     const gem = path.join(rubyPrefix, 'bin', 'gem')
     const bundlerVersionConstraint = /^\d+\.\d+\.\d+/.test(bundlerVersion) ? bundlerVersion : `~> ${bundlerVersion}`
@@ -59487,13 +59489,8 @@ async function setupRuby(options = {}) {
   if (inputs['bundler'] !== 'none') {
     const [gemfile, lockFile] = bundler.detectGemfiles()
 
-    if(inputs['rubygems-version'] !== 'default') {
-      await common.measure('Unistalling existing Bundler version(s)', async () =>
-        await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['uninstall', 'bundler', '-aI']))
-    }
-
     const bundlerVersion = await common.measure('Installing Bundler', async () =>
-      bundler.installBundler(inputs['bundler'], lockFile, platform, rubyPrefix, engine, version))
+      bundler.installBundler(inputs['bundler'], lockFile, platform, rubyPrefix, engine, version, inputs['rubygems-version']))
 
     if (inputs['bundler-cache'] === 'true') {
       await common.measure('bundle install', async () =>

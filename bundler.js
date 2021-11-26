@@ -50,7 +50,7 @@ async function afterLockFile(lockFile, platform, engine, rubyVersion) {
   }
 }
 
-export async function installBundler(bundlerVersionInput, lockFile, platform, rubyPrefix, engine, rubyVersion) {
+export async function installBundler(bundlerVersionInput, lockFile, platform, rubyPrefix, engine, rubyVersion, rubygemsVersionInput) {
   let bundlerVersion = bundlerVersionInput
 
   if (bundlerVersion === 'default' || bundlerVersion === 'Gemfile.lock') {
@@ -88,6 +88,8 @@ export async function installBundler(bundlerVersionInput, lockFile, platform, ru
     console.log(`Using Bundler 2 shipped with ${engine}-${rubyVersion}`)
   } else if (engine.startsWith('truffleruby') && common.isBundler1Default(engine, rubyVersion) && bundlerVersion.startsWith('1')) {
     console.log(`Using Bundler 1 shipped with ${engine}-${rubyVersion}`)
+  } else if (rubygemsVersionInput !== 'default') {
+    console.log(`Using default Bundler installed with Rubygems ${rubygemsVersionInput}`)
   } else {
     const gem = path.join(rubyPrefix, 'bin', 'gem')
     const bundlerVersionConstraint = /^\d+\.\d+\.\d+/.test(bundlerVersion) ? bundlerVersion : `~> ${bundlerVersion}`
