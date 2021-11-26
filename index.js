@@ -62,7 +62,10 @@ export async function setupRuby(options = {}) {
     await inputs['afterSetupPathHook']({ platform, rubyPrefix, engine, version })
   }
 
-  if (inputs['rubygems-version'] !== 'default') {
+  if (inputs['rubygems-version'] === 'default') {
+    await common.measure('Debug Rubygems', async () =>
+      await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['--version']))
+  } else {
     await common.measure('Updating Rubygems', async () =>
       await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['update', '--system', inputs['rubygems-version']]))
   }
