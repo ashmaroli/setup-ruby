@@ -59481,7 +59481,8 @@ async function setupRuby(options = {}) {
       await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['--version']))
   } else {
     await common.measure('Updating Rubygems', async () =>
-      await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['update', '--system', inputs['rubygems-version']]))
+      await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['update', '--system', inputs['rubygems-version']], async () =>
+        await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['uninstall', 'bundler'])))
   }
 
   if (inputs['bundler'] !== 'none') {
