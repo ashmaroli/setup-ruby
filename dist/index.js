@@ -59416,6 +59416,7 @@ const os = __nccwpck_require__(2087)
 const fs = __nccwpck_require__(5747)
 const path = __nccwpck_require__(5622)
 const core = __nccwpck_require__(2186)
+const exec = __nccwpck_require__(1514)
 const common = __nccwpck_require__(4717)
 const bundler = __nccwpck_require__(1641)
 
@@ -59423,6 +59424,7 @@ const windows = common.windows
 
 const inputDefaults = {
   'ruby-version': 'default',
+  'rubygems-version': 'default',
   'bundler': 'default',
   'bundler-cache': 'true',
   'working-directory': '.',
@@ -59472,6 +59474,11 @@ async function setupRuby(options = {}) {
   // libraries & headers, build tools, etc.
   if (inputs['afterSetupPathHook'] instanceof Function) {
     await inputs['afterSetupPathHook']({ platform, rubyPrefix, engine, version })
+  }
+
+  if (inputs['rubygems-version'] !== 'default') {
+    await common.measure('Updating Rubygems', async () =>
+      await exec.exec(path.join(rubyPrefix, 'bin', 'gem'), ['update', '--system', inputs['rubygems-version']]))
   }
 
   if (inputs['bundler'] !== 'none') {
