@@ -59431,6 +59431,7 @@ const inputDefaults = {
   'bundler-cache': 'true',
   'working-directory': '.',
   'cache-version': bundler.DEFAULT_CACHE_VERSION,
+  'post-ruby-install': null,
 }
 
 // entry point when this action is run on its own
@@ -59487,6 +59488,11 @@ async function setupRuby(options = {}) {
   }
 
   if (inputs['bundler'] !== 'none') {
+    if (inputs['post-ruby-install']) {
+      await common.measure('Running Post Ruby Install Hook', async () =>
+        await exec.exec(inputs['post-ruby-install']))
+    }
+
     const [gemfile, lockFile] = bundler.detectGemfiles()
 
     const bundlerVersion = await common.measure('Installing Bundler', async () =>
