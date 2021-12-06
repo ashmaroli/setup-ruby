@@ -536,7 +536,7 @@ function restoreCache(paths, primaryKey, restoreKeys, options) {
             if (core.isDebug()) {
                 yield tar_1.listTar(archivePath, compressionMethod);
             }
-            const archiveFileSize = utils.getArchiveFileSizeInBytes(archivePath);
+            const archiveFileSize = utils.getArchiveFileSizeIsBytes(archivePath);
             core.info(`Cache Size: ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B)`);
             yield tar_1.extractTar(archivePath, compressionMethod);
             core.info('Cache restored successfully');
@@ -581,29 +581,18 @@ function saveCache(paths, key, options) {
         const archiveFolder = yield utils.createTempDirectory();
         const archivePath = path.join(archiveFolder, utils.getCacheFileName(compressionMethod));
         core.debug(`Archive Path: ${archivePath}`);
-        try {
-            yield tar_1.createTar(archiveFolder, cachePaths, compressionMethod);
-            if (core.isDebug()) {
-                yield tar_1.listTar(archivePath, compressionMethod);
-            }
-            const fileSizeLimit = 10 * 1024 * 1024 * 1024; // 10GB per repo limit
-            const archiveFileSize = utils.getArchiveFileSizeInBytes(archivePath);
-            core.debug(`File Size: ${archiveFileSize}`);
-            if (archiveFileSize > fileSizeLimit) {
-                throw new Error(`Cache size of ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B) is over the 10GB limit, not saving cache.`);
-            }
-            core.debug(`Saving Cache (ID: ${cacheId})`);
-            yield cacheHttpClient.saveCache(cacheId, archivePath, options);
+        yield tar_1.createTar(archiveFolder, cachePaths, compressionMethod);
+        if (core.isDebug()) {
+            yield tar_1.listTar(archivePath, compressionMethod);
         }
-        finally {
-            // Try to delete the archive to save space
-            try {
-                yield utils.unlinkFile(archivePath);
-            }
-            catch (error) {
-                core.debug(`Failed to delete archive: ${error}`);
-            }
+        const fileSizeLimit = 5 * 1024 * 1024 * 1024; // 5GB per repo limit
+        const archiveFileSize = utils.getArchiveFileSizeIsBytes(archivePath);
+        core.debug(`File Size: ${archiveFileSize}`);
+        if (archiveFileSize > fileSizeLimit) {
+            throw new Error(`Cache size of ~${Math.round(archiveFileSize / (1024 * 1024))} MB (${archiveFileSize} B) is over the 5GB limit, not saving cache.`);
         }
+        core.debug(`Saving Cache (ID: ${cacheId})`);
+        yield cacheHttpClient.saveCache(cacheId, archivePath, options);
         return cacheId;
     });
 }
@@ -771,7 +760,7 @@ function uploadChunk(httpClient, resourceUrl, openStream, start, end) {
 function uploadFile(httpClient, cacheId, archivePath, options) {
     return __awaiter(this, void 0, void 0, function* () {
         // Upload Chunks
-        const fileSize = utils.getArchiveFileSizeInBytes(archivePath);
+        const fileSize = fs.statSync(archivePath).size;
         const resourceUrl = getCacheApiUrl(`caches/${cacheId.toString()}`);
         const fd = fs.openSync(archivePath, 'r');
         const uploadOptions = options_1.getUploadOptions(options);
@@ -821,7 +810,7 @@ function saveCache(cacheId, archivePath, options) {
         yield uploadFile(httpClient, cacheId, archivePath, options);
         // Commit Cache
         core.debug('Commiting cache');
-        const cacheSize = utils.getArchiveFileSizeInBytes(archivePath);
+        const cacheSize = utils.getArchiveFileSizeIsBytes(archivePath);
         core.info(`Cache Size: ~${Math.round(cacheSize / (1024 * 1024))} MB (${cacheSize} B)`);
         const commitCacheResponse = yield commitCache(httpClient, cacheId, cacheSize);
         if (!requestUtils_1.isSuccessStatusCode(commitCacheResponse.statusCode)) {
@@ -901,10 +890,10 @@ function createTempDirectory() {
     });
 }
 exports.createTempDirectory = createTempDirectory;
-function getArchiveFileSizeInBytes(filePath) {
+function getArchiveFileSizeIsBytes(filePath) {
     return fs.statSync(filePath).size;
 }
-exports.getArchiveFileSizeInBytes = getArchiveFileSizeInBytes;
+exports.getArchiveFileSizeIsBytes = getArchiveFileSizeIsBytes;
 function resolvePaths(patterns) {
     var e_1, _a;
     var _b;
@@ -1209,7 +1198,7 @@ function downloadCacheHttpClient(archiveLocation, archivePath) {
         const contentLengthHeader = downloadResponse.message.headers['content-length'];
         if (contentLengthHeader) {
             const expectedLength = parseInt(contentLengthHeader);
-            const actualLength = utils.getArchiveFileSizeInBytes(archivePath);
+            const actualLength = utils.getArchiveFileSizeIsBytes(archivePath);
             if (actualLength !== expectedLength) {
                 throw new Error(`Incomplete download. Expected file size: ${expectedLength}, actual file size: ${actualLength}`);
             }
@@ -59430,6 +59419,7 @@ const os = __nccwpck_require__(2087)
 const fs = __nccwpck_require__(5747)
 const path = __nccwpck_require__(5622)
 const core = __nccwpck_require__(2186)
+const exec = __nccwpck_require__(1514)
 const common = __nccwpck_require__(4717)
 const bundler = __nccwpck_require__(1641)
 
@@ -59441,6 +59431,7 @@ const inputDefaults = {
   'bundler-cache': 'true',
   'working-directory': '.',
   'cache-version': bundler.DEFAULT_CACHE_VERSION,
+  'post-ruby-install': null,
 }
 
 // entry point when this action is run on its own
@@ -59489,6 +59480,14 @@ async function setupRuby(options = {}) {
   }
 
   if (inputs['bundler'] !== 'none') {
+    // Similar to 'afterSetupPathHook' but for use within the Runner environment directly by end-user.
+    // If Bundler isn't being installed, this hook is redundant because the user is then free to execute
+    // their script in a separate `job.step`.
+    if (inputs['post-ruby-install']) {
+      await common.measure('Running Post Ruby Install Hook', async () =>
+        await exec.exec(inputs['post-ruby-install']))
+    }
+
     const [gemfile, lockFile] = bundler.detectGemfiles()
 
     const bundlerVersion = await common.measure('Installing Bundler', async () =>
