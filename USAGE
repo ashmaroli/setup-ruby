@@ -1,15 +1,28 @@
-Description:
-    The 'rails new' command creates a new Rails application with a default
-    directory structure and configuration at the path you specify.
+=== Storing Encrypted Files in Source Control
 
-    You can specify extra command-line arguments to be used every time
-    'rails new' runs in the .railsrc configuration file in your home directory,
-    or in $XDG_CONFIG_HOME/rails/railsrc if XDG_CONFIG_HOME is set.
+The Rails `encrypted` commands provide access to encrypted files or configurations.
+See the `Rails.application.encrypted` documentation for using them in your app.
 
-    Note that the arguments specified in the .railsrc file don't affect the
-    defaults values shown above in this help message.
+=== Encryption Keys
 
-Example:
-    rails new ~/Code/Ruby/weblog
+By default, Rails looks for the encryption key in `config/master.key` or
+`ENV["RAILS_MASTER_KEY"]`, but that lookup can be overridden with `--key`:
 
-    This generates a skeletal Rails installation in ~/Code/Ruby/weblog.
+   rails encrypted:edit config/encrypted_file.yml.enc --key config/encrypted_file.key
+
+Don't commit the key! Add it to your source control's ignore file. If you use
+Git, Rails handles this for you.
+
+=== Editing Files
+
+To edit or create an encrypted file use:
+
+   rails encrypted:edit config/encrypted_file.yml.enc
+
+This opens a temporary file in `$EDITOR` with the decrypted contents for editing.
+
+=== Viewing Files
+
+To print the decrypted contents of an encrypted file use:
+
+   rails encrypted:show config/encrypted_file.yml.enc
