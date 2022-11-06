@@ -1,3 +1,3 @@
 # frozen_string_literal: true
 
-Rails.application.load_tasks
+say "It works from file!"

@@ -1,3 +1,3 @@
 # frozen_string_literal: true
 
-Rails.application.load_tasks
+create_dummy_app("spec/dummy")
