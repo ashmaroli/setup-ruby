@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
-module Rails
-  # Returns the currently loaded version of Rails as a <tt>Gem::Version</tt>.
+module ActiveSupport
+  # Returns the currently loaded version of Active Support as a <tt>Gem::Version</tt>.
   def self.gem_version
     Gem::Version.new VERSION::STRING
   end
