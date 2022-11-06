@@ -1,100 +1,91 @@
 # frozen_string_literal: true
 
-require "rails/configuration"
+require "rails/railtie/configuration"
 
 module Rails
-  class Railtie
-    class Configuration
-      def initialize
-        @@options ||= {}
+  class Engine
+    class Configuration < ::Rails::Railtie::Configuration
+      attr_reader :root
+      attr_accessor :middleware, :javascript_path
+      attr_writer :eager_load_paths, :autoload_once_paths, :autoload_paths
+
+      def initialize(root = nil)
+        super()
+        @root = root
+        @generators = app_generators.dup
+        @middleware = Rails::Configuration::MiddlewareStackProxy.new
+        @javascript_path = "javascript"
       end
 
-      # Expose the eager_load_namespaces at "module" level for convenience.
-      def self.eager_load_namespaces # :nodoc:
-        @@eager_load_namespaces ||= []
-      end
-
-      # All namespaces that are eager loaded
-      def eager_load_namespaces
-        @@eager_load_namespaces ||= []
-      end
-
-      # Add files that should be watched for change.
-      def watchable_files
-        @@watchable_files ||= []
-      end
-
-      # Add directories that should be watched for change.
-      # The key of the hashes should be directories and the values should
-      # be an array of extensions to match in each directory.
-      def watchable_dirs
-        @@watchable_dirs ||= {}
-      end
-
-      # This allows you to modify the application's middlewares from Engines.
+      # Holds generators configuration:
       #
-      # All operations you run on the app_middleware will be replayed on the
-      # application once it is defined and the default_middlewares are
-      # created
-      def app_middleware
-        @@app_middleware ||= Rails::Configuration::MiddlewareStackProxy.new
-      end
-
-      # This allows you to modify application's generators from Railties.
+      #   config.generators do |g|
+      #     g.orm             :data_mapper, migration: true
+      #     g.template_engine :haml
+      #     g.test_framework  :rspec
+      #   end
       #
-      # Values set on app_generators will become defaults for application, unless
-      # application overwrites them.
-      def app_generators
-        @@app_generators ||= Rails::Configuration::Generators.new
-        yield(@@app_generators) if block_given?
-        @@app_generators
+      # If you want to disable color in console, do:
+      #
+      #   config.generators.colorize_logging = false
+      #
+      def generators
+        @generators ||= Rails::Configuration::Generators.new
+        yield(@generators) if block_given?
+        @generators
       end
 
-      # First configurable block to run. Called before any initializers are run.
-      def before_configuration(&block)
-        ActiveSupport.on_load(:before_configuration, yield: true, &block)
-      end
+      def paths
+        @paths ||= begin
+          paths = Rails::Paths::Root.new(@root)
 
-      # Third configurable block to run. Does not run if +config.eager_load+
-      # set to false.
-      def before_eager_load(&block)
-        ActiveSupport.on_load(:before_eager_load, yield: true, &block)
-      end
+          paths.add "app",                 eager_load: true,
+                                           glob: "{*,*/concerns}",
+                                           exclude: ["assets", javascript_path]
+          paths.add "app/assets",          glob: "*"
+          paths.add "app/controllers",     eager_load: true
+          paths.add "app/channels",        eager_load: true
+          paths.add "app/helpers",         eager_load: true
+          paths.add "app/models",          eager_load: true
+          paths.add "app/mailers",         eager_load: true
+          paths.add "app/views"
 
-      # Second configurable block to run. Called before frameworks initialize.
-      def before_initialize(&block)
-        ActiveSupport.on_load(:before_initialize, yield: true, &block)
-      end
+          paths.add "lib",                 load_path: true
+          paths.add "lib/assets",          glob: "*"
+          paths.add "lib/tasks",           glob: "**/*.rake"
 
-      # Last configurable block to run. Called after frameworks initialize.
-      def after_initialize(&block)
-        ActiveSupport.on_load(:after_initialize, yield: true, &block)
-      end
+          paths.add "config"
+          paths.add "config/environments", glob: -"#{Rails.env}.rb"
+          paths.add "config/initializers", glob: "**/*.rb"
+          paths.add "config/locales",      glob: "**/*.{rb,yml}"
+          paths.add "config/routes.rb"
+          paths.add "config/routes",       glob: "**/*.rb"
 
-      # Array of callbacks defined by #to_prepare.
-      def to_prepare_blocks
-        @@to_prepare_blocks ||= []
-      end
+          paths.add "db"
+          paths.add "db/migrate"
+          paths.add "db/seeds.rb"
 
-      # Defines generic callbacks to run before #after_initialize. Useful for
-      # Rails::Railtie subclasses.
-      def to_prepare(&blk)
-        to_prepare_blocks << blk if blk
-      end
+          paths.add "vendor",              load_path: true
+          paths.add "vendor/assets",       glob: "*"
 
-      def respond_to?(name, include_private = false)
-        super || @@options.key?(name.to_sym)
-      end
-
-    private
-      def method_missing(name, *args, &blk)
-        if name.end_with?("=")
-          @@options[:"#{name[0..-2]}"] = args.first
-        elsif @@options.key?(name)
-          @@options[name]
-        else
-          super
+          paths
         end
+      end
+
+      def root=(value)
+        @root = paths.path = Pathname.new(value).expand_path
+      end
+
+      def eager_load_paths
+        @eager_load_paths ||= paths.eager_load
+      end
+
+      def autoload_once_paths
+        @autoload_once_paths ||= paths.autoload_once
+      end
+
+      def autoload_paths
+        @autoload_paths ||= paths.autoload_paths
       end
     end
   end
