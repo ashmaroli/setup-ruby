@@ -2,9 +2,9 @@
 
 require_relative "gem_version"
 
-module Rails
-  # Returns the currently loaded version of Rails as a string.
+module ActiveSupport
+  # Returns the currently loaded version of Active Support as a <tt>Gem::Version</tt>.
   def self.version
-    VERSION::STRING
+    gem_version
   end
 end

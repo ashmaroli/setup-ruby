@@ -1,77 +1,93 @@
 # frozen_string_literal: true
 
-require "active_support/core_ext/time/conversions"
-require "active_support/core_ext/object/blank"
-require "active_support/log_subscriber"
-require "rack/body_proxy"
+require "active_support/logger_silence"
+require "active_support/logger_thread_safe_level"
+require "logger"
 
-module Rails
-  module Rack
-    # Sets log tags, logs the request, calls the app, and flushes the logs.
+module ActiveSupport
+  class Logger < ::Logger
+    include LoggerSilence
+
+    # Returns true if the logger destination matches one of the sources
     #
-    # Log tags (+taggers+) can be an Array containing: methods that the +request+
-    # object responds to, objects that respond to +to_s+ or Proc objects that accept
-    # an instance of the +request+ object.
-    class Logger < ActiveSupport::LogSubscriber
-      def initialize(app, taggers = nil)
-        @app          = app
-        @taggers      = taggers || []
-      end
+    #   logger = Logger.new(STDOUT)
+    #   ActiveSupport::Logger.logger_outputs_to?(logger, STDOUT)
+    #   # => true
+    def self.logger_outputs_to?(logger, *sources)
+      logdev = logger.instance_variable_get(:@logdev)
+      logger_source = logdev.dev if logdev.respond_to?(:dev)
+      sources.any? { |source| source == logger_source }
+    end
 
-      def call(env)
-        request = ActionDispatch::Request.new(env)
-
-        if logger.respond_to?(:tagged)
-          logger.tagged(compute_tags(request)) { call_app(request, env) }
-        else
-          call_app(request, env)
-        end
-      end
-
-      private
-        def call_app(request, env) # :doc:
-          instrumenter = ActiveSupport::Notifications.instrumenter
-          instrumenter_state = instrumenter.start "request.action_dispatch", request: request
-          instrumenter_finish = -> () {
-            instrumenter.finish_with_state(instrumenter_state, "request.action_dispatch", request: request)
-          }
-
-          logger.info { started_request_message(request) }
-          status, headers, body = @app.call(env)
-          body = ::Rack::BodyProxy.new(body, &instrumenter_finish)
-          [status, headers, body]
-        rescue Exception
-          instrumenter_finish.call
-          raise
-        ensure
-          ActiveSupport::LogSubscriber.flush_all!
+    # Broadcasts logs to multiple loggers.
+    def self.broadcast(logger) # :nodoc:
+      Module.new do
+        define_method(:add) do |*args, &block|
+          logger.add(*args, &block)
+          super(*args, &block)
         end
 
-        # Started GET "/session/new" for 127.0.0.1 at 2012-09-26 14:51:42 -0700
-        def started_request_message(request) # :doc:
-          'Started %s "%s" for %s at %s' % [
-            request.raw_request_method,
-            request.filtered_path,
-            request.remote_ip,
-            Time.now.to_default_s ]
+        define_method(:<<) do |x|
+          logger << x
+          super(x)
         end
 
-        def compute_tags(request) # :doc:
-          @taggers.collect do |tag|
-            case tag
-            when Proc
-              tag.call(request)
-            when Symbol
-              request.send(tag)
+        define_method(:close) do
+          logger.close
+          super()
+        end
+
+        define_method(:progname=) do |name|
+          logger.progname = name
+          super(name)
+        end
+
+        define_method(:formatter=) do |formatter|
+          logger.formatter = formatter
+          super(formatter)
+        end
+
+        define_method(:level=) do |level|
+          logger.level = level
+          super(level)
+        end
+
+        define_method(:local_level=) do |level|
+          logger.local_level = level if logger.respond_to?(:local_level=)
+          super(level) if respond_to?(:local_level=)
+        end
+
+        define_method(:silence) do |level = Logger::ERROR, &block|
+          if logger.respond_to?(:silence)
+            logger.silence(level) do
+              if defined?(super)
+                super(level, &block)
+              else
+                block.call(self)
+              end
+            end
+          else
+            if defined?(super)
+              super(level, &block)
             else
-              tag
+              block.call(self)
             end
           end
         end
+      end
+    end
 
-        def logger
-          Rails.logger
-        end
+    def initialize(*args, **kwargs)
+      super
+      @formatter = SimpleFormatter.new
+    end
+
+    # Simple formatter which only displays the message.
+    class SimpleFormatter < ::Logger::Formatter
+      # This method is invoked when a log event occurs
+      def call(severity, timestamp, progname, msg)
+        "#{String === msg ? msg : msg.inspect}\n"
+      end
     end
   end
 end
