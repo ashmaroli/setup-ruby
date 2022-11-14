@@ -1,34 +1,10 @@
 {
-  "name": "setup-ruby",
-  "version": "0.1.0",
-  "description": "Download a prebuilt Ruby and add it to the PATH in 5 seconds",
-  "main": "index.js",
-  "scripts": {
-    "package": "ncc build index.js -o dist"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/ruby/setup-ruby.git"
-  },
-  "keywords": [
-    "GitHub",
-    "Actions",
-    "Ruby"
-  ],
-  "author": "Benoit Daloze",
-  "license": "MIT",
-  "bugs": {
-    "url": "https://github.com/ruby/setup-ruby/issues"
-  },
-  "homepage": "https://github.com/ruby/setup-ruby",
+  "name": "dummy",
+  "private": true,
   "dependencies": {
-    "@actions/cache": "^1.0.7",
-    "@actions/core": "^1.4.0",
-    "@actions/exec": "^1.1.0",
-    "@actions/io": "^1.1.1",
-    "@actions/tool-cache": "^1.7.1"
-  },
-  "devDependencies": {
-    "@vercel/ncc": "^0.28.6"
+    "@rails/actioncable": "file:../../../../actioncable",
+    "@rails/activestorage": "file:../../../../activestorage",
+    "@rails/ujs": "file:../../../../actionview",
+    "@rails/webpacker": "^6.0.0-rc.5"
   }
 }
